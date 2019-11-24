@@ -1,0 +1,374 @@
+---
+title: "MachineLearning_Lab01"
+author: "Sreenand.S"
+date: "24/11/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Assignment 1 :Spam classification with nearest neighbors
+# 1.1
+
+
+```{r 1.1,echo= FALSE}
+library(readxl)
+library(caTools)
+library(class)
+library(kknn)
+spambase<-read_excel("spambase.xlsx")
+n=dim(spambase)[1]
+set.seed(12345)
+id = sample(1:n,floor(n*0.5))
+train = spambase[id,]
+test = spambase[-id,]
+
+```
+Spambase datafile is imported and the code is divided into 2 chunks of testing and training data which are 50:50.
+
+
+# 1.2
+
+
+```{r Logistic Regression 1, echo=FALSE}
+
+#Fitting the model to logistic regression
+classifier_train = glm(formula = Spam~.,family = binomial(link = 'logit'),data = train)
+classifier_test = glm(formula = Spam~.,family = binomial(link = 'logit'),data = test)
+#Prediction for training data
+prediction = predict(classifier_train,newx=as.matrix(train), type = 'response')
+#Classification of the predicted values(0.5)
+y_pred = ifelse(prediction>0.5,1,0)
+confusionMatrix_train =  table(y_pred,train$Spam)
+confusionMatrix_train
+#Misclassifier for training data(0.5)
+misClasifier1 = 1 - (sum(diag(confusionMatrix_train))/sum(confusionMatrix_train))
+misClasifier1
+#Prediction for the testset
+prediction2 = predict(classifier_test,newx = as.matrix(test),type = 'response')
+#for 0.5
+y_pred_test = ifelse(prediction2>0.5,"Spam","Not Spam")
+confusionMatrix_test = table(y_pred_test,test$Spam)
+confusionMatrix_test
+#misclasifier
+misClasifier3 = 1 - (sum(diag(confusionMatrix_test))/sum(confusionMatrix_test))
+misClasifier3
+```
+p(Y = 1|X)>0.5
+
+The model is fitted with logistic regression for the training data and the misclassifier is observed to be  16.28% and Accuracy is 83.70% .
+The model is fitted with logistic regression for the training data and the misclassifier is observed to be  14.90% and Accuracy is 85.10%.
+It is observed that the accuracy for the test data is more than that of the training data if p(Y = 1|X)>0.5
+
+# 1.3
+
+```{r Logistic Regression 2,echo= FALSE }
+#Classification of the predicted train values(0.8)
+y_pred2 = ifelse(prediction>0.8,1,0)
+confusionMatrix_train =  table(y_pred2,train$Spam)
+confusionMatrix_train
+#Miscalculation for training data (0.8)
+misClasifier2 = 1 - (sum(diag(confusionMatrix_train))/sum(confusionMatrix_train))
+misClasifier2
+#Classification of the predicted test values(0.8)
+y_pred_test2 = ifelse(prediction2>0.8,"Spam","Not Spam")
+confusionMatrix_test = table(y_pred_test2,test$Spam)
+confusionMatrix_test
+#Miscalculation for test data (0.8)
+misClasifier4 = 1 - (sum(diag(confusionMatrix_test))/sum(confusionMatrix_test))
+misClasifier4
+```
+p(Y = 1|X)>0.8
+
+The model is fitted with logistic regression and the misclassification for the trainig data is observed to be  24.74% and Accuracy is 75.25%.
+The model is fitted with logistic regression and the misclassification for the test data is observed to be  26.71% and  Accuracy is 73.29%.
+It is observed that the training data has more has more accuracy than the test data when p(Y = 1|X)>0.8.
+
+# 1.4
+
+```{r KNN Classification,echo=FALSE}
+
+#KNN(training data)
+#Fittinging model to KNN
+classifier_knn =kknn(formula = Spam~.,train,test,na.action = na.omit(),k=30,distance = 1 ,kernel = "optimal")
+#PRediction for the testset using kknn
+prediction4 = fitted(classifier_knn)
+#Classification of the prediction
+y_pred_train_kknn = ifelse(prediction4>0.5,"Spam","Not Spam")
+confusionMatrix_train_kknn1 = table(y_pred_train_kknn,train$Spam)
+confusionMatrix_train_kknn1
+#misClasifier
+misClasifierkknn1 = 1 - (sum(diag(confusionMatrix_train_kknn1))/sum(confusionMatrix_train_kknn1))
+misClasifierkknn1#KNN
+#KNN(test data)
+#Classification of the prediction
+y_pred_test_kknn = ifelse(prediction4>0.5,"Spam","Not Spam")
+confusionMatrix_test_kknn1 = table(y_pred_test_kknn,test$Spam)
+confusionMatrix_test_kknn1
+#misClasifier
+misClasifierkknn1 = 1 - (sum(diag(confusionMatrix_test_kknn1))/sum(confusionMatrix_test_kknn1))
+misClasifierkknn1
+```
+ When K=30
+When the KNN Classifier is used it is observed that the misclassification for the training data is 51.40% and the Accuracy is  48.6%.
+When the KNN Classifier is used it is observed that the misclassification for the test data is 32.84% and the Accuracy is  67.16%.
+It is observed that the test data has a higher accuracy than the training data when K=30 with KNN model for p(Y = 1|X)>0.5.
+
+From this it is observed that the logistic regression is more efficient classifier than the KNN classifier as it has higher accuracy.
+
+# 1.5
+
+```{r  KNN Classification with differnt values of K,echo=FALSE}
+#Fitting model to KNN
+classifier_knn =kknn(formula = Spam~.,train,test,na.action = na.omit(),k=1,distance = 1 ,kernel = "optimal")
+#Prediction for the testset using kknn
+prediction5 = fitted(classifier_knn)
+#Classification of the prediction
+y_pred_train_kknn = ifelse(prediction5>0.5,"Spam","Not Spam")
+confusionMatrix_train_kknn2 = table(y_pred_train_kknn,train$Spam)
+confusionMatrix_train_kknn2
+#misClasifier
+misClasifierkknn2 = 1 - (sum(diag(confusionMatrix_train_kknn2))/sum(confusionMatrix_train_kknn2))
+misClasifierkknn2
+#Classification of the prediction
+y_pred_test_kknn = ifelse(prediction5>0.5,"Spam","Not Spam")
+confusionMatrix_test_kknn1 = table(y_pred_test_kknn,test$Spam)
+confusionMatrix_test_kknn1
+#misClasifier
+misClasifierkknn1 = 1 - (sum(diag(confusionMatrix_test_kknn1))/sum(confusionMatrix_test_kknn1))
+misClasifierkknn1
+```
+K=1
+When the KNN Classifier is used it is observed that the misclassification for the training data is 49.12% and the Accuracy is  50.88%.
+When the KNN Classifier is used it is observed that the misclassification for the training data is 35.54% and the Accuracy is  64.46%.
+It is observed that the test data has a higher accuracy than the training data when K=30 with KNN model for p(Y = 1|X)>0.5.
+Taking all the observations into consideration it is seen that logistic regression is a more efficient classifier in this case.
+
+
+## Assignment 3 : Feature selection by cross-validation in a linear model.
+
+
+
+```{r K cross Validation,echo= FALSE}
+
+#linear regression
+mylin=function(X,Y, Xpred){
+  Xpred1=cbind(1,Xpred)
+  #MISSING: check formulas for linear regression and compute beta
+  X=cbind(1,X)
+  #beta
+  beta= solve(t(X)%*%X)%*%t(X)%*%Y
+  Res=Xpred1%*%beta
+  return(Res)
+}
+
+myCV=function(X,Y,Nfolds){
+  n=length(Y)
+  
+  p=ncol(X)
+ 
+  set.seed(12345)
+  ind=sample(n,n)
+  
+  X1=X[ind,]
+  
+  Y1=Y[ind]
+  
+  sf=floor(n/Nfolds)
+  MSE=numeric(2^p-1)
+  Nfeat=numeric(2^p-1)
+  Features=list()
+  curr=0
+  
+  #we assume 5 features.
+  
+  for (f1 in 0:1)
+    for (f2 in 0:1)
+      for(f3 in 0:1)
+        for(f4 in 0:1)
+          for(f5 in 0:1){
+            model= c(f1,f2,f3,f4,f5)
+            if (sum(model)==0) next()
+            SSE=0
+            
+            for (k in 1:Nfolds){
+              #MISSING: compute which indices should belong to current fold
+              index1<-(k-1)*sf
+              index2<-k*sf
+              flag<-((index1)+1):index2
+              #MISSING: implement cross-validation for model with features in "model" and iteration i.
+              X_test<-X1[flag,which(model==1)]
+              X_train<-X1[-flag,which(model==1)]
+              Yp<-Y1[flag]
+              Y_train<-Y1[-flag]
+              Ypred<-mylin(X_train,Y_train,X_test)
+              
+              #MISSING: Get the predicted values for fold 'k', Ypred, and the original values for folf 'k', Yp.
+              SSE=SSE+sum((Ypred-Yp)^2)
+            }
+            curr=curr+1
+            MSE[curr]=SSE/n
+            Nfeat[curr]=sum(model)
+            Features[[curr]]=model
+            
+          }
+  
+  #MISSING: plot MSE against number of features
+  plot(MSE,Nfeat)
+  i=which.min(MSE)
+  return(list(CV=MSE[i], Features=Features[[i]]))
+}
+
+myCV(as.matrix(swiss[,2:6]), swiss[[1]], 5)
+```
+
+Here it is observed that the CV score is 50.44% and  1,3,4,5 are the best models that can be used. Therefore these features would have the largest impact.
+
+## Assignment 4. Linear regression and regularization
+
+# 4.1 Importing data and plotting moisture vs protein
+```{r Moisture versus Protein}
+library(readxl)
+library(MASS)
+library(glmnet)
+
+tecator<-read_excel("tecator.xlsx")
+
+#4.1
+model<-lm(tecator$Protein~tecator$Moisture)
+plot(tecator$Moisture,tecator$Protein)
+abline(model,col = 'red')
+summary(model)
+```
+
+Formula:Y_hat = 1.99987 + 0.24813x
+
+Here it is seen that the correlation is positive and hence this data can be described well by a linear model.
+Since the p-value is lesser than 0.05 which indicates that moisture is a significant parameter of protein.
+
+# 4.2
+```{r Moisture a polynomial funciton of protein}
+n=dim(tecator)[1]
+set.seed(12345)
+id = sample(1:n,floor(n*0.5))
+train<-tecator[id,]
+test<-tecator[-id,]
+#ActualY<-test$Moisture
+model<-list()
+variance<-numeric(6)
+Y<-numeric(6)
+bias<-vector()
+MSE<-vector()
+for (i in 1:6) {
+  model$i<-lm(train$Moisture~poly(train$Protein,i),data = train)
+  Y<-predict(model$i,newdata = train,type = "response")
+  bias[i]<-mean(Y)-mean(train$Moisture)
+  variance[i]<-var(Y)
+  MSE[i]<-mean((train$Moisture-Y)^2)
+}
+plot(x=c(1:6),y=MSE,xlab= "No. of iterations",ylab = "MSE",type = "l")
+plot(bias,variance,type = "l")
+```
+
+It is observed that as the degree of polynomial increases the MSE criterion decreases .The MSE criterion is the least when the degree of the polynomial is 6.This shows that MSE can be used as criterion when fitting these type of models. 
+
+
+# 4.3
+```{r Best model}
+n=dim(tecator)[1]
+set.seed(12345)
+id = sample(1:n,floor(n*0.5))
+train<-tecator[id,]
+test<-tecator[-id,]
+#ActualY<-test$Moisture
+model<-list()
+variance<-numeric(6)
+Y<-numeric(6)
+bias<-vector()
+MSE<-vector()
+for (i in 1:6) {
+  model$i<-lm(train$Moisture~poly(train$Protein,i),data = train)
+  Y<-predict(model$i,newdata = test,type = "response")
+  bias[i]<-mean(Y)-mean(test$Moisture)
+  variance[i]<-var(Y)
+  MSE[i]<-mean((test$Moisture-Y)^2)
+}
+plot(x=c(1:6),y=MSE,xlab= "No. of iterations",ylab = "MSE",type = "l")
+plot(bias,variance,type = "l")
+```
+
+
+
+# 4.4
+```{r step AIC}
+X<-tecator[,2:102]
+
+model2<-lm(Fat~.,data = X)
+# fit<-stepAIC(model2,direction = "both")
+# fit$annova
+```
+63 parameters have been selected siginficant factor to have a influence on the response variable. After reaching 95 the AIC factor is constant for every trial.
+
+# 4.5
+```{r Ridge Regression}
+X <- data.matrix(tecator[,1:100])
+Y <- data.matrix(tecator$Fat)
+lseq <- 10^seq(-1,10, 3)
+fit <- glmnet(X, Y, alpha = 0, lambda  = lseq)
+plot(fit,xvar = "lambda",label = TRUE)
+ridge_cv <- cv.glmnet(X, Y, alpha = 0, lambda = lseq)
+best_lambda <- ridge_cv$lambda.min
+best_lambda
+best_fit <- ridge_cv$glmnet.fit
+ridge_cv$glmnet.fit
+plot(ridge_cv,type = 'l')
+```
+As log(lambda)/lambda increases, the model coefficients appear to move towards zero but does not reach zero.
+
+#4.6
+```{r Lasso}
+X <- data.matrix(tecator[,1:100])
+Y <- data.matrix(tecator$Fat)
+lseq <- 10^seq(-1,10, 3)
+lseq[length(lseq)+1]=0
+fit <- glmnet(X, Y, alpha = 1, lambda  = lseq)
+plot(fit,xvar = "lambda",label = TRUE)
+ridge_cv <- cv.glmnet(X, Y, alpha = 0, lambda = lseq)
+best_lambda <- ridge_cv$lambda.min
+best_lambda
+best_fit <- ridge_cv$glmnet.fit
+ridge_cv$glmnet.fit
+plot(ridge_cv,type = 'l')
+```
+As log(lambda) increase the coefficeinets move towards zero.Also, here the MSE is directly proprtionla to log(lambda)
+The lasso regression takes less parameters to form a model. this helps in reducing overfitting.Hence, lasso regression is good for this data.
+
+#4.7 
+```{r Cross-validation Lasso}
+CV_model <- cv.glmnet(X, Y, alpha = 1, lambda = lseq)
+lambda_b <- CV_model$lambda.min
+lambda_b
+lasso <- glmnet(x=X, y=Y,alpha=1, lambda = lambda_b)
+cv_score <- cbind(CV_model$lambda,CV_model$cvm)
+min_cv <- cv_score[which(cv_score[,1] == CV_model$lambda.min),2]
+optimal_features <- as.matrix(coef(lasso))
+total_optimal_features <- length(which(optimal_features[,1] !=0))
+plot(CV_model$lambda,CV_model$cvm)
+lasso$beta
+```
+
+
+Since lambda is taken to be zero the model is now a linear regression which takes all the 100 values as significant parameters.
+
+#4.8
+Step 4 variable selection is based on stepAIC which selects 63 variables and in step 7 all the 100 variables are selected.
+
+## Appendix 
+
+```{r ref.label=knitr::all_labels(), echo = T, eval = F}
+
+}
+
+
