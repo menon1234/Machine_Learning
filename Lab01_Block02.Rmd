@@ -1,0 +1,305 @@
+---
+title: "Lab01_Block2 "
+author: "Sreenand.S"
+date: "03/12/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+RNGversion('3.5.1')
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(adabag)
+library(mboost)
+library(randomForest)
+sp <- read.csv2("spambase.csv")
+ sp$Spam <- as.factor(sp$Spam)
+n = dim(sp)[1]
+set.seed(12345) 
+id = sample(1:n, floor(n*2/3))
+train = sp[id,] 
+test = sp[-id,]
+k<-1
+misclassifier<-numeric(10)
+misclassifier2<-numeric(10)
+skip<-seq(10,100,10)
+
+```
+
+## Assignment1
+
+The spambases dataset is used and 2/3 percent of the data is used for training set and 1/3rd of it is used as the test set.
+
+## 1.1-Adaboost Classifiation
+```{r blackboost_test,eval= FALSE}
+RNGversion('3.5.1')
+for (i in skip) {
+  model<-blackboost(Spam~.,data = train,weights = NULL,na.action = na.pass,family = AdaExp(),control = boost_control(mstop = i))
+  prediction<-predict.mboost(object = model, newdata = test)
+  confusionmatrix<-table(test$Spam,prediction>0)
+  
+  misclassifier[i/10]<-1-(sum(diag(confusionmatrix))/sum(confusionmatrix))
+  
+  }
+confusionmatrix
+misclassifier
+plot(skip,misclassifier,type = "b",pch = 19, col = "blue",main = "Adaboost MisClassifiation",xlab = "No. of trees")
+
+```
+
+Adaboost classification is used and the no. of trees are taken as 10,20,30,40,50,60,70,80,90,100.
+Here the least misclassification rate is when the no. of trees is 90.
+
+
+
+## 1.2 - RandomForest Classification
+
+```{r randomforest_test, eval=FALSE}
+RNGversion('3.5.1')
+set.seed(12345)
+for (i in skip) {
+  model3<-randomForest(Spam~.,data = train,ntree= i)
+  prediction3<-predict(object = model3, newdata = test)
+  confusionmatrix3<-table(test$Spam,prediction3)
+  confusionmatrix3
+  misclassifier2[i/10]<-1-(sum(diag(confusionmatrix3))/sum(confusionmatrix3))
+  
+}
+confusionmatrix3
+misclassifier2
+plot(skip,misclassifier2,type = "b",col = "red",pch = 19,main = "RandomForest MisClassifiation",xlab = "No. of trees")
+
+
+```
+
+
+## Adaboost Vs RandomForest
+```{r Difference,eval= FALSE}
+
+plot(skip,misclassifier2,type = "b",col = "red",pch = 19,main = "RandomForest vS Adaboost",xlab = "No. of trees", ylim = c(0.020,0.15))
+points(skip,misclassifier,type = "b",pch = 19, col = "blue")
+```
+
+From the graph above it is observed that Randomforest Classifier has a lesser miscalculation rate than the adaboost classifier by a significant value and hence randomforest can be said to be the better classifier.
+
+## Assignment2-Mixture Models
+
+```{r K=2, eval= FALSE}
+set.seed(1234567890)
+max_it <- 100 # max number of EM iterations
+min_change <- 0.1 # min change in log likelihood between two consecutive EM iterations
+N=1000 # number of training points
+D=10 # number of dimensions
+x <- matrix(nrow=N, ncol=D) # training data
+true_pi <- vector(length = 3) # true mixing coefficients
+true_mu <- matrix(nrow=3, ncol=D) # true conditional distributions
+true_pi=c(1/3, 1/3, 1/3)
+true_mu[1,]=c(0.5,0.6,0.4,0.7,0.3,0.8,0.2,0.9,0.1,1)
+true_mu[2,]=c(0.5,0.4,0.6,0.3,0.7,0.2,0.8,0.1,0.9,0)
+true_mu[3,]=c(0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5)
+plot(true_mu[1,], type="o", col="blue", ylim=c(0,1))
+points(true_mu[2,], type="o", col="red")
+points(true_mu[3,], type="o", col="green")
+# Producing the training data
+for(n in 1:N) {
+  k <- sample(1:3,1,prob=true_pi)
+  for(d in 1:D) {
+    x[n,d] <- rbinom(1,1,true_mu[k,d])
+  }
+}
+#for k=2
+K=2 # number of guessed components
+z <- matrix(nrow=N, ncol=K) # fractional component assignments
+pi <- vector(length = K) # mixing coefficients
+mu <- matrix(nrow=K, ncol=D) # conditional distributions
+llik <- vector(length = max_it) # log likelihood of the EM iterations
+# Random initialization of the paramters
+pi <- runif(K,0.49,0.51)
+pi <- pi / sum(pi)
+for(k in 1:K) {
+  mu[k,] <- runif(D,0.49,0.51)
+}
+
+for(it in 1:max_it) 
+{
+  probability_x <- exp(x %*% log(t(mu)) + (1 - x) %*% log(1 - t(mu)))
+  
+  new_pi <- matrix(pi,ncol = K, nrow = N, byrow = TRUE)
+  prob_pi <- probability_x * pi
+  
+  prob_z <- prob_pi / rowSums(prob_pi)
+
+  llik[it] <- sum(log(rowSums(prob_pi)))
+  if((llik[it]-llik[it-1]<= min_change) && (it >1))
+   {
+     break
+  }
+ 
+    pi <- colSums(prob_z)/N
+    mu <- (t(prob_z) %*% x)/colSums(prob_z)
+}
+
+print("Convergence Level")
+print(it)
+print("Maximum Liklihood")
+print(max(llik[1:it]))
+print("pi Values")
+print(pi)
+print("Mu Values")
+print(mu)
+
+ plot(mu[1,], type="o", col="blue", ylim=c(0,1))
+ points(mu[2,], type="o", col="red")
+plot(llik[1:it],type ='o', col = "blue")
+```
+
+Here when the number of components are only 2 then the liklihood converges after 12 iterations and the maximum liklihood is observed to be -6362.898.
+
+```{r  K =3 , eval= FALSE }
+set.seed(1234567890)
+max_it <- 100 # max number of EM iterations
+min_change <- 0.1 # min change in log likelihood between two consecutive EM iterations
+N=1000 # number of training points
+D=10 # number of dimensions
+x <- matrix(nrow=N, ncol=D) # training data
+true_pi <- vector(length = 3) # true mixing coefficients
+true_mu <- matrix(nrow=3, ncol=D) # true conditional distributions
+true_pi=c(1/3, 1/3, 1/3)
+true_mu[1,]=c(0.5,0.6,0.4,0.7,0.3,0.8,0.2,0.9,0.1,1)
+true_mu[2,]=c(0.5,0.4,0.6,0.3,0.7,0.2,0.8,0.1,0.9,0)
+true_mu[3,]=c(0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5)
+# plot(true_mu[1,], type="o", col="blue", ylim=c(0,1))
+# points(true_mu[2,], type="o", col="red")
+# points(true_mu[3,], type="o", col="green")
+# Producing the training data
+for(n in 1:N) {
+  k <- sample(1:3,1,prob=true_pi)
+  for(d in 1:D) {
+    x[n,d] <- rbinom(1,1,true_mu[k,d])
+  }
+}
+#for k=2
+K=3 # number of guessed components
+z <- matrix(nrow=N, ncol=K) # fractional component assignments
+pi <- vector(length = K) # mixing coefficients
+mu <- matrix(nrow=K, ncol=D) # conditional distributions
+llik <- vector(length = max_it) # log likelihood of the EM iterations
+# Random initialization of the paramters
+pi <- runif(K,0.49,0.51)
+pi <- pi / sum(pi)
+for(k in 1:K) {
+  mu[k,] <- runif(D,0.49,0.51)
+}
+
+for(it in 1:max_it) 
+{
+  probability_x <- exp(x %*% log(t(mu)) + (1 - x) %*% log(1 - t(mu)))
+  
+  new_pi <- matrix(pi,ncol = K, nrow = N, byrow = TRUE)
+  prob_pi <- probability_x * pi
+  
+  prob_z <- prob_pi / rowSums(prob_pi)
+
+  llik[it] <- sum(log(rowSums(prob_pi)))
+  if((llik[it]-llik[it-1]<= min_change) && (it >1))
+   {
+     break
+  }
+ 
+    pi <- colSums(prob_z)/N
+    mu <- (t(prob_z) %*% x)/colSums(prob_z)
+}
+
+print("Convergence Level")
+print(it)
+print("Maximum Liklihood")
+print(max(llik[1:it]))
+print("pi Values")
+print(pi)
+print("Mu Values")
+print(mu)
+
+ plot(mu[1,], type="o", col="blue", ylim=c(0,1))
+ points(mu[2,], type="o", col="red")
+ points(mu[3,], type="o", col="green")
+plot(llik[1:it],type ='o', col = "blue")
+```
+
+When the number of components is 3 then the maximum liklihood has increased from when K was only 2.
+The liklihood converges after 22 iterations and the maximum liklihood here is -6345.393 which is a lot higher than the previous step which showed -6362.This looks very similar to the given model.
+
+```{r  K=4,eval= FALSE}
+set.seed(1234567890)
+max_it <- 100 # max number of EM iterations
+min_change <- 0.1 # min change in log likelihood between two consecutive EM iterations
+N=1000 # number of training points
+D=10 # number of dimensions
+x <- matrix(nrow=N, ncol=D) # training data
+true_pi <- vector(length = 3) # true mixing coefficients
+true_mu <- matrix(nrow=3, ncol=D) # true conditional distributions
+true_pi=c(1/3, 1/3, 1/3)
+true_mu[1,]=c(0.5,0.6,0.4,0.7,0.3,0.8,0.2,0.9,0.1,1)
+true_mu[2,]=c(0.5,0.4,0.6,0.3,0.7,0.2,0.8,0.1,0.9,0)
+true_mu[3,]=c(0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5)
+# plot(true_mu[1,], type="o", col="blue", ylim=c(0,1))
+# points(true_mu[2,], type="o", col="red")
+# points(true_mu[3,], type="o", col="green")
+# Producing the training data
+for(n in 1:N) {
+  k <- sample(1:3,1,prob=true_pi)
+  for(d in 1:D) {
+    x[n,d] <- rbinom(1,1,true_mu[k,d])
+  }
+}
+#for k=2
+K=4 # number of guessed components
+z <- matrix(nrow=N, ncol=K) # fractional component assignments
+pi <- vector(length = K) # mixing coefficients
+mu <- matrix(nrow=K, ncol=D) # conditional distributions
+llik <- vector(length = max_it) # log likelihood of the EM iterations
+# Random initialization of the paramters
+pi <- runif(K,0.49,0.51)
+pi <- pi / sum(pi)
+for(k in 1:K) {
+  mu[k,] <- runif(D,0.49,0.51)
+}
+
+for(it in 1:max_it) 
+{
+  probability_x <- exp(x %*% log(t(mu)) + (1 - x) %*% log(1 - t(mu)))
+  
+  new_pi <- matrix(pi,ncol = K, nrow = N, byrow = TRUE)
+  prob_pi <- probability_x * pi
+  
+  prob_z <- prob_pi / rowSums(prob_pi)
+
+  llik[it] <- sum(log(rowSums(prob_pi)))
+  if((llik[it]-llik[it-1]<= min_change) && (it >1))
+   {
+     break
+  }
+ 
+    pi <- colSums(prob_z)/N
+    mu <- (t(prob_z) %*% x)/colSums(prob_z)
+}
+
+print("Convergence Level")
+print(it)
+print("Maximum Liklihood")
+print(max(llik[1:it]))
+print("pi Values")
+print(pi)
+print("Mu Values")
+print(mu)
+
+ plot(mu[1,], type="o", col="blue", ylim=c(0,1))
+ points(mu[2,], type="o", col="red")
+ points(mu[3,], type="o", col="green")
+ points(mu[4,], type="o", col="black")
+plot(llik[1:it],type ='o', col = "blue")
+```
+
+When the no. of components are 4 then the Maximum liklihood is even more but it is only slightly grater hence 3 components seem to be more ideal no. of components to be taken for the distributions.
+Here the liklihood converges after 27 iterations and the maximum liklihood is -6343 whichshows that there has only been a slight increase in the maximum liklihood.
+Hence considering all the cases where K=2,3,4 , K=3 appears to be the ideal number of components.
+
