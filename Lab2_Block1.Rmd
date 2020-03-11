@@ -1,0 +1,452 @@
+---
+title: "Lab2_Block1"
+author: "Sreenand.S"
+date: "08/12/2019"
+output: html_document
+---
+# Lab 2 Block 1
+
+## Data Setup
+```{r setup, include=FALSE}
+RNGversion("3.5.1")
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(SDMTools)
+library(party)
+library(tree)
+library(ineq)
+library(rpart)
+library(rpart.plot)
+library(caTools)
+library(caret)
+library(class)
+library(maptree)
+library(naivebayes)
+library(ggplot2)
+library(dplyr)
+library(MASS)
+library(readr)
+library(fastICA)
+creditscoring<-read_excel("creditscoring.xls")
+n = dim(creditscoring)[1]
+set.seed(12345) 
+id = sample(1:n, floor(n*0.5))
+train = creditscoring[id,] 
+id1 = setdiff(1:n, id)
+set.seed(12345)
+id2 = sample(id1, floor(n*0.25))
+valid = creditscoring[id2,]
+id3 = setdiff(id1,id2)
+test = creditscoring[id3,] 
+creditscoring$good_bad=as.factor(creditscoring$good_bad)
+```
+
+## A2.1-Deriving the dataset
+
+```{r 2.2-Deriving the dataset}
+RNGversion("3.5.1")
+creditscoring<-read_excel("creditscoring.xls")
+n = dim(creditscoring)[1]
+set.seed(12345) 
+id = sample(1:n, floor(n*0.5))
+train = creditscoring[id,] 
+id1 = setdiff(1:n, id)
+set.seed(12345)
+id2 = sample(id1, floor(n*0.25))
+valid = creditscoring[id2,]
+id3 = setdiff(id1,id2)
+test = creditscoring[id3,] 
+creditscoring$good_bad=as.factor(creditscoring$good_bad)
+```
+
+The dataset is derived and split into 50% as training set and the rest as validation and test set.
+## A2.2:Gini and Deviance Index
+
+```{r 2.3-Fitting using Deviance and Gini index,echo = FALSE}
+RNGversion("3.5.1")
+#Classifier with deviance
+tree_dev<-tree(as.factor(good_bad)~.,data=train,method = "recursive.partition",split = c("deviance"))
+#Prediction
+predict_tree_test<-predict(tree_dev, test,type = "class")
+predict_tree_train<-predict(tree_dev,train,type = "class")
+#Confusion matrix for evaluating  the model(test)
+confusionMatrix<-table(predict_tree_test,test$good_bad)
+confusionMatrix
+#Confusion matrix for evaluating the model(train)
+confusionMatrix1<-table(predict_tree_train,train$good_bad)
+confusionMatrix1
+#Misclassification rate for deviance (train)
+misclassification_rate_deviance_train<-1-(sum(diag(confusionMatrix1))/sum(confusionMatrix1))
+cat("\n The Deviance index train data missclassification rate is ",misclassification_rate_deviance_train)
+#Misclassification rate for deviance (test)
+misclassification_rate_deviance_test<-1-(sum(diag(confusionMatrix))/sum(confusionMatrix))
+cat("\n The Deviance index test data missclassification rate is ",misclassification_rate_deviance_test)
+
+##Gini index
+#Classifier with Gini
+tree_dev2<-tree(as.factor(good_bad)~.,data=train,method = "recursive.partition",split = c("gini"))
+#Prediction
+predict_tree_test1<-predict(tree_dev2, test,type = "class")
+predict_tree_train1<-predict(tree_dev2,train,type = "class")
+#Confusion matrix for evaluating  the model(test)
+confusionMatrix<-table(predict_tree_test1,test$good_bad)
+confusionMatrix
+#Confusion matrix for evaluating the model(train)
+confusionMatrix1<-table(predict_tree_train1,train$good_bad)
+confusionMatrix1
+
+#Misclassification rate for deviance (train)
+misclassification_rate_gini_train<-1-(sum(diag(confusionMatrix1))/sum(confusionMatrix1))
+cat("\n The Gini index train data missclassification rate is ",misclassification_rate_gini_train)
+#Misclassification rate for deviance (test)
+misclassification_rate_gini_test<-1-(sum(diag(confusionMatrix))/sum(confusionMatrix))
+cat("\n The Gini index test data missclassification rate is ",misclassification_rate_gini_test)
+```
+
+When the deviance index is used there is a misclassification rate of 21.2% when the confusion matrix is built around the train data and when it is used on the test data there is only a slight difference.
+When the gini index increase of the misclassification rate when it is built on the test data.
+In this case the tree model seems to give a better fit when deviance is used.
+
+## A2.3-Optimal tree
+
+```{r 2.4 -Finding the optimal tree,echo = FALSE}
+RNGversion("3.5.1")
+
+fit=tree(as.factor(good_bad)~., data=train)
+terminal_node = summary(fit)$size
+set.seed(12345)
+trainScore=rep(0,terminal_node)
+testScore=rep(0,terminal_node)
+for(i in 2:terminal_node) {
+  prunedTree=prune.tree(fit,best=i)
+  pred=predict(prunedTree, newdata=valid,
+               type="tree")
+  trainScore[i]=deviance(prunedTree)
+  testScore[i]=deviance(pred)
+}
+plot(2:terminal_node, trainScore[2:terminal_node], type="b", col="red",
+     ylim=c(0,800))
+points(2:terminal_node, testScore[2:terminal_node], type="b", col="blue")
+
+min_dev <- which(testScore[2:terminal_node] == min(testScore[2:terminal_node]) )
+cat("\n The minimum deviance is found out to be when the depth of the tree is ",min_dev)
+
+#The optimal depth of the tree is found out and fit to find the best tree
+
+finalTree=prune.tree(fit, best=min_dev)
+Yfit=predict(finalTree, newdata=valid,
+             type="class")
+confusionmatrix5<-table(Yfit,valid$good_bad)
+confusionmatrix5
+misclassification<-1-(sum(diag(confusionmatrix5))/sum(confusionmatrix5))
+misclassification
+plot(finalTree)
+text(finalTree)
+
+
+```
+
+
+The optimal tree depth is found out to be 3 which has the least deviance and when it is used the misclassification rate is found out to be 29.6%.The optimal tree structure is displayed above.
+
+
+## A2.4-Naive Bayes Model
+
+```{r 2.4-Naive Bayes,echo = FALSE}
+RNGversion("3.5.1")
+#predict with naive bayes (train data)
+fit_naive_bayes<-naive_bayes(good_bad~., data=train,type = "prob")
+predict_naive_bayes_train<-predict(fit_naive_bayes,train,type = "class")
+confusionmatrix4<-table(predict_naive_bayes_train,train$good_bad)
+confusionmatrix4
+misclassification_naive_bayes_train<-1-(sum(diag(confusionmatrix4))/sum(confusionmatrix4))
+cat("\n The misclassification rate when the Naive bayes models is used on train data is ",misclassification_naive_bayes_train)
+#Naive bayes clssifier (test data)
+predict_naive_bayes_test<-predict(fit_naive_bayes,test,type = "class")
+confusionmatrix3<-table(predict_naive_bayes_test,test$good_bad)
+confusionmatrix3
+misclassification_naive_bayes<-1-(sum(diag(confusionmatrix3))/sum(confusionmatrix3))
+cat("\n The misclassification rate when the Naive bayes models is used on test data is ",misclassification_naive_bayes)
+
+```
+
+When Naive bayes Classifier is used on the test data the misclassification rate is found out to be 30% and when predicted on train data it is observed as 31.6%. In conclusion it is seen that it has a higher misclassification rate than compared to the Tree with the best fit of the tree.
+
+## A2.5- ROC curve
+
+```{r 2.5-Optimal tree and the Naïve Bayes model to classify the test data,echo = FALSE}
+RNGversion("3.5.1")
+#For optimal tree
+pie = seq(0.05,0.95,by = 0.05)
+fit_optimal_tree<-tree(as.factor(good_bad)~., data=train,split = "deviance")
+finalTree=prune.tree(fit_optimal_tree, best=min_dev)
+predict_optimal_tree<-predict(finalTree,test)
+
+good_prob <- predict_optimal_tree[,which(colnames(predict_optimal_tree)=="good")]
+
+test1 <- test
+#temp_pred <- ifelse(predict_naive_bayes == "good",1,0)
+new_y <- ifelse(test1$good_bad == "good",1,0)
+newmatrix<-matrix(1,nrow = length(pie))
+tpr_fpr<-matrix(nrow =length(pie),ncol = 2)
+
+for (i in 1:length(pie)) {
+  
+  y_pred_test = ifelse(good_prob>pie[i],1,0)
+  
+  con_mat <- confusion.matrix(y_pred_test,new_y)
+  
+  tpr <- con_mat[2,2]/sum(con_mat[2,1]+con_mat[2,2])
+  fpr <- con_mat[1,2]/sum(con_mat[1,1]+con_mat[1,2])
+  tpr_fpr[i,] <- c(fpr,tpr)
+  }
+#For Naive bayes
+predict_naive_bayes<-predict(fit_naive_bayes,test,type = "prob")
+
+good_prob1 <- predict_naive_bayes[,which(colnames(predict_naive_bayes)=="good")]
+
+test1 <- test
+tpr_fpr_naive<-matrix(nrow =length(pie),ncol = 2)
+#temp_pred <- ifelse(predict_naive_bayes == "good",1,0)
+new_y <- ifelse(test1$good_bad == "good",1,0)
+newmatrix<-matrix(1,nrow = length(pie))
+tpr_fpr_naive<-matrix(nrow =length(pie),ncol = 2)
+
+for (i in 1:length(pie)) {
+  
+  y_pred_test1 = ifelse(good_prob1>pie[i],1,0)
+  
+  con_mat <- confusion.matrix(y_pred_test1,new_y)
+  
+  tpr1 <- con_mat[2,2]/sum(con_mat[2,])
+  fpr1 <- con_mat[1,2]/sum(con_mat[1,])
+  tpr_fpr_naive[i,] <- c(fpr1,tpr1)
+}
+
+plot(tpr_fpr[,1],tpr_fpr[,2],type = "l",col = "red",pch = 19,xlab = "FPR",ylab = "TPR",main = "FPR VS TRP Optimal Tree")
+points(tpr_fpr_naive[,1],tpr_fpr_naive[,2],type = "l", col = "green",pch= 19,xlab = "FPR",ylab = "TPR",main = "FPR VS TRP Naive Bayes")
+
+```
+
+From the Roc curve above it is seen that there is only a slight change between the naive bayes and the Optimal tree model. Also, naive bayes more area under the curve so hence naive bayes can be thought of as the better classifier.
+
+## A2.6-Naive bayes with loss matrix
+
+```{r 2.6- Naive Bayes classification with loss matrix,echo = FALSE}
+RNGversion("3.5.1")
+# the naive bayes model is fitted for the test and train data above and hence we can use these to derive the misclassification rate.
+predict_naive_bayes_test<-predict(fit_naive_bayes,test,type = "prob")
+predict_naive_bayes_train<-predict(fit_naive_bayes,train,type = "prob")
+good_prob2 <- predict_naive_bayes_train[,which(colnames(predict_naive_bayes_train)=="good")]
+good_prob3 <- predict_naive_bayes_test[,which(colnames(predict_naive_bayes_test)=="good")]
+
+naive_bayes_train_loss<-ifelse(good_prob2>0.1,'good','bad')
+naive_bayes_test_loss<-ifelse(good_prob3>0.1,'good','bad')
+conf_mat_train<-table(naive_bayes_train_loss,train$good_bad)
+conf_mat_train
+conf_mat_test<-table(naive_bayes_test_loss,test$good_bad)
+conf_mat_test
+
+# misclassification rate
+miscal_naive_train<-1-(sum(diag(conf_mat_train))/sum(conf_mat_train))
+miscal_naive_test<-1- (sum(diag(conf_mat_test))/sum(conf_mat_test))
+cat("\n The misclassification rate when the train data is used is",miscal_naive_train)
+cat("\n The misclasification rate when the test data is used is ",miscal_naive_test)
+```
+
+The misclassification rate using the train data is somewhere around 26% whereas the error rate when uesing test data is around 28%.Thus it is much less than when the loss function is not used.
+
+## A3.1-Reorder data
+
+
+```{r 3.1-Reorder of data,echo = FALSE}
+RNGversion("3.5.1")
+State.data <- read_csv2("State.csv")
+#Ordered data
+State.data <-State.data[order(State.data$MET),]
+
+
+plot(EX~MET, State.data,pch = 15,col = "blue",main ="EX VS MET")
+
+```
+
+As noted in the above Figure the data is not correlated and hence you cant fit a straight line onto this.The data seems very dispersed and theredore a tree would be an ideal fit for this.
+
+## A3.2-Cross Validation
+```{r 3.2-Selecting leaves by Cross Validation,echo = FALSE }
+RNGversion("3.5.1")
+##Trainig the model
+trainedmodel<-tree(formula=EX~MET,data=State.data,control = tree.control(nobs = nrow(State.data),minsize = 8))
+#Fitted tree
+plot(trainedmodel)
+text(trainedmodel)
+
+tree_cv1<-cv.tree(trainedmodel)
+plot(tree_cv1,main = "Deviance Vs tree size")
+##Plotting the  cv tree
+
+
+plot(tree_cv1$size,tree_cv1$dev,type = "b",main = "Size Vs Deviance",col = "red")
+
+Optimal_Size<- tree_cv1$size[which(tree_cv1$dev==min(tree_cv1$dev))] 
+cat("\n Optimal tree:",Optimal_Size)
+##b original vs fitted data
+
+OptimalTree=prune.tree(trainedmodel,best = Optimal_Size)
+OptimalTreeFit=predict(OptimalTree, State.data)
+
+resultant  <- data.frame(Indicated=State.data$MET,original=State.data$EX,predicted=OptimalTreeFit)
+# ggplot(resultant , aes(x = Indicated,color = "variable")) +
+#   geom_point(aes(y = original, col = "original")) +
+#   geom_point(aes(y = predicted, col = "predicted"))+
+#   ggtitle("Predicted Vs original using optimal tree of size 3")
+#c Histogram of the residuals
+residuals <- State.data$EX - OptimalTreeFit
+
+hist(residuals)
+```
+
+The graph shows the least deviance is at point 3 having the deviance as 178460.7.From the histogram it is observed that is tail is towards the right so it is not a good fit.
+The optimal tree chosn here is 3 since it has the least deviance.
+The graph given above shows the original and the predicted data when the optimal size of the tree is used.
+The histogram shows that the residuals are spread across the dataset.
+
+## A3.3- Non-Parametric Bootstrap
+
+```{r 3.3- non-parametric bootstrap,echo = FALSE}
+RNGversion("3.5.1")
+#95% Confidence bands  for the regression tree model using non-parametric bootstrap
+library(boot)
+set.seed(12345)
+ordered_data=State.data[order(State.data$MET),]
+non_para_f=function(data,ind)
+{
+  sample_ext<-State.data[ind,]
+  trainedmodel<-tree(formula=EX~MET,data=sample_ext,control = tree.control(nobs =nrow(sample_ext),minsize = 8))
+  OptimalTree=prune.tree(trainedmodel,best = Optimal_Size)
+  OptimalTreeFit=predict(OptimalTree, newdata=data)
+  return(OptimalTreeFit)
+}
+non_para_boot = boot(State.data,non_para_f,R = 1000)
+e = envelope(non_para_boot,level = 0.95)
+plot(ordered_data$MET,State.data$EX,main = "95 % confidence bands using non-parametric bootstrap",bg = "orange",pch = 15,ylim = c(150,600))
+points(ordered_data$MET,e$point[1,],col = 'violet',type = "l")
+points(ordered_data$MET,e$point[2,],col = 'red',type = "l")
+points(ordered_data$MET,OptimalTreeFit,type = "l",pch = 15,col = "green")
+legend("topright",c("Upper Band","Predicted","Lower Band"),fill = c("violet","green","red"))
+
+
+
+
+```
+
+The confidence interval bands are close to each other and the fit is not as good as shown in step 2. The confidence band leaves out most of the data.The confidence bands are bumpy and not smooth.This is because of the bias.
+
+## A3.4-Parametric Bootstrap
+
+```{r 3.4 - parametric bootstrap,echo = FALSE}
+RNGversion("3.5.1")
+ordered_data=State.data[order(State.data$MET),]
+mle = prune.tree(tree(EX~MET,ordered_data,minsize = 8),best = Optimal_Size)
+
+rng=function(data, mle) {
+data1=data.frame(EX=ordered_data$EX, MET=ordered_data$MET)
+n=length(ordered_data$EX)
+#generate new EX
+pred_val <- predict(mle, newdata=data)
+residual <- data$EX - pred_val
+data1$EX=rnorm(n,pred_val,sd(residuals))
+return(data1)
+}
+para_bootstrap=function(data1){
+tree_classification <- tree(EX~MET,data1,control = tree.control(nobs = nrow(data1),minsize = 8))
+  res=prune.tree(tree_classification,best = Optimal_Size)#fit linear model
+#predict values for all Area values from the original data
+EXPred=predict(res,newdata=data1)#ordered_data)
+EX_Pred_norm <- rnorm(length(ordered_data$EX),EXPred,sd(residuals(OptimalTree)))
+return(EX_Pred_norm)
+}
+
+para_boot =boot(ordered_data,statistic = para_bootstrap,R = 1000,mle = mle,ran.gen = rng,sim = "parametric")
+e = envelope(para_boot,level = 0.95)
+treefit<-tree(EX~MET,ordered_data,control = tree.control(nobs = nrow(ordered_data),minsize = 8))
+parapred<-predict(treefit)
+plot(ordered_data$MET,ordered_data$EX,pch = 21,bg = "orange",main = "95% Confidence bands using parametric bootstrap",ylim = c(100,600))
+points(ordered_data$MET,parapred,type = "l", col = "green")
+#confidence bands
+points(ordered_data$MET, e$point[2,], type="l", col="red",pch = 19)
+points(ordered_data$MET, e$point[1,], type="l", col="violet", pch = 19)
+legend("topright",c("Upper Band","Predicted","Lower Band"),fill = c("violet","green","red"))
+
+```
+
+The Graph above shows a higher prediction bandwidth covering most of the data points.Only 5 % of the data is out of the prediction band and this is how it should be as the data should cover 95 % of the data.
+
+## A3.5
+```{r 3.5,echo = FALSE}
+# Checking the best fit
+hist(residuals)
+
+```
+
+From looking at the histogram residuals it can said that the non parametric bootstrap model would be more ideal for this type of distribution since it is scattered. The prediction bands for the non-parametric estimation is much lesser than that of the parametric and for the non - prarametric it seems to overfit the data as it covers 99 percent of the data.
+
+## A4.1-Standard PCA
+
+```{r 4.1-Conducting standard PCA by using feature space,echo = FALSE}
+RNGversion("3.5.1")
+Assignment4 <- read.csv2("NIRspectra.csv",header = T, sep = ";",quote = "\"",fill = T)
+# Assignment4
+Assignment4$Viscosity=c()
+
+res = prcomp(Assignment4)
+# summary(res)
+screeplot(res)
+
+print(min(res$rotation[1]))
+print(max(res$rotation[1]))
+print(length(res$rotation))
+# head(U)
+plot(res$x[,1],res$x[,2] , ylim=c(-0.2,0.2),xlim = c(-1,1),xlab = "PC2",ylab = "PC1")
+lambda = res$sdev^2
+#eigenvalues
+ # lambda
+#proportion of variation
+sf<-as.numeric(sprintf("%2.3f",lambda/sum(lambda)*100))
+total_per<-sf[1]+sf[2]
+total_per
+
+
+```
+Here two components are selected after seeing the scree graph as the first component covers almost 99 percent of the variances and the second component captures a signicant amount of variances as compared to the rest of the components. From the plot it is observed that there are a few outliers and hence there are unusual diesel fuels. 
+
+## A4.2-Trace Plots
+
+```{r 4.2-Trace Plots,echo = FALSE}
+RNGversion("3.5.1")
+U=res$rotation
+plot(U[,1], main="Traceplot, PC1")
+plot(U[,2],main="Traceplot, PC2")
+```
+
+The variance reduces as the number of features increases.The variance for the PC1 after 100 features has reduced drastically whereas when u look at component 2 it starts off with a low variance and towards the end ahs high variance.Hence the first components which capture most of the variances can be explained by the original features.
+
+## A4.3-Independant Component Analysis
+
+```{r 4.3- Independant component analysis,echo = FALSE }
+RNGversion("3.5.1")
+set.seed(12345)
+ICA<-fastICA(Assignment4,2)
+W_hat<-ICA$K %*% ICA$W
+plot(W_hat[,1],main = "Traceplot PC1")
+plot(W_hat[,2],main = "Traceplot PC2")
+plot(ICA$S, main = "ICA components", col  = )
+```
+
+In both the cases the data points are clustered around the 0 point and hence can be concluded that both are highly correlated.
+
+### Appendix
+
+```{r , ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+```
+

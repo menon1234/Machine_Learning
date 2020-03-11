@@ -1,0 +1,325 @@
+---
+title: "Lab2Block2"
+author: "Sreenand.S"
+date: "10/12/2019"
+output: 
+  html_document: default
+  word_document: default
+  pdf_document: default
+  always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+RNGversion("3.5.1")
+library(readxl)
+library(mgcv)
+library(interp)
+library(grid)
+library(glmnet)
+library(ggplot2)
+library(plotly)
+library(pamr)
+library(caret)
+library(kernlab)
+inf<-read_xlsx("Influenza.xlsx")
+
+```
+
+## Assignment 1
+
+### 1.1:Relation between the mortality rates and the influenza rates
+
+```{r 1.1 -reading the file and inspection, echo=FALSE}
+RNGversion("3.5.1")
+inf<-read_xlsx("Influenza.xlsx")
+
+
+
+ggplot(inf)+geom_point(aes(x= inf$Time,y= inf$Mortality),col = 'RED')+geom_point(aes(x=inf$Time,y= inf$Influenza),col = 'VIOLET')+ggtitle("TimeSeries plot between influenza and mortality")
+```
+
+From the graphs above it is observed that there is a slight linear relationship between the mortality rates and the influenza affecting the people. It is a positive relationship.The Mortality seeems to be at a constant rate throughout the year whereas the influenza has a major spike in between.
+
+### 1.2:Gam Function
+
+You can also embed plots, for example:
+
+```{r 1.2, echo=FALSE}
+RNGversion("3.5.1")
+Gamfit<- gam(Mortality~Year+s(Week, k=length(unique(inf$Week))),data = inf,method = "GCV.Cp")
+
+plot(Gamfit)
+s=interp(inf$Year,inf$Week, fitted(Gamfit))  
+# summary(Gamfit)
+Gamfit$sig2
+```
+
+ The probabilistic model is : Mortality~N(-680.598 + 1.233*Year + spline(week)+std. err
+
+### 1.3:Spline component
+```{r 1.3 -Observed mortality against time,echo=FALSE}
+RNGversion("3.5.1")
+gampred<- predict(Gamfit,inf)
+MvTdf<-as.data.frame(gampred,inf)
+ggplot(MvTdf)+geom_line(aes(x=inf$Time,y=inf$Mortality,color = 'Mortality'))+geom_point(aes(x=inf$Time,y = gampred, col = 'Predicted Mortality'))+ggtitle("Observed mortality vs the predicted values")
+
+
+```
+
+The predicted values are too smooth.The model does not predict any of the data which are above the range of 2200 and the data that are below 1600 from which it can be pointed out that it does not include the outlier values and hence would not be the best fit.
+It is observed that there is no change in trend over the years and hence the same trend can be observed throughout the years.
+
+```{r 1.3.2-Spline Component Plot,echo=FALSE}
+RNGversion("3.5.1")
+
+s=interp(inf$Year,inf$Week, fitted(Gamfit))
+# plot_ly(x=~s$x, y=~s$y, z=~s$z, type="surface")
+summary(Gamfit)
+plot.gam(Gamfit,residuals = TRUE)
+```
+
+It is observed fron the graph that the rate of mortality is higher in the start of the year and reduces in between and towards the end of the years it peaks again. The inference can be made that in the cold months the rate of mortality is higher during the colder months and it less common when it is sunny.
+From the model summary it is seen that the p-value of the year is much higher than that of the week and hence it can be inferred that the Year is more significant.
+
+### 1.4:Penalty factor of the spline function
+
+```{r,echo=FALSE }
+RNGversion("3.5.1")
+Gamfit1<- gam(Mortality~Year+s(Week, k=length(unique(inf$Week))),sp=Gamfit$sp, data = inf,method = "GCV.Cp")
+cat("\n The sp of the model fitted with the sp of the previous model is",Gamfit$sp , "and the deviance is ",Gamfit1$deviance)
+
+Gamfit1$sp
+```
+When the penalty factor of the first model is fit to the new model and when the standard deviation is tested there seems to be no change in the deviance from the first and the second model.
+
+
+```{r using high and low penalty factors,echo=FALSE }
+RNGversion("3.5.1")
+Gamfit3<- gam(Mortality~Year+s(Week, k=length(unique(inf$Week))),sp = 1, data = inf,method = "GCV.Cp")
+Gamfit4<- gam(Mortality~Year+s(Week, k=length(unique(inf$Week))),sp = 100, data = inf,method = "GCV.Cp")
+summary(Gamfit3)
+summary(Gamfit4)
+
+gam_pred3<-predict(Gamfit3,inf)
+gam_pred4<-predict(Gamfit4,inf)
+HighLowDf<-as.data.frame(gam_pred3,gam_pred4,inf)
+ggplot(HighLowDf)+geom_line(aes(x=inf$Time,y=inf$Mortality,color = 'Original'),size=0.8)+geom_line(aes(x=inf$Time,y = gam_pred3, color = 'Low Penalty Factor'),size=0.8)+geom_line(aes(x=inf$Time,y = gam_pred4,color = "High Penalty Factor"),size=0.8)+ggtitle("High vs Low Penalty factors")
+# print(Gamfit3)
+# print(Gamfit4)
+Gamfit3$deviance
+Gamfit4$deviance
+```
+
+It is observed that with the low penalty factor there is a lower deviance and with a high penalty factor there is  increase in the deviance level and the when the spline fucntion is used it gives the optimal sp value. When the sp value is high it causes underfitting and when it is low it causes overfitting.
+The degrees of freedom is observed to reduce with the increase in the sp value.This confirms the relationship df is inversely propotional to the lambda value.
+
+### 1.5:residuals and the influenza values against time
+```{r,echo=FALSE }
+RNGversion("3.5.1")
+ggplot(MvTdf)+geom_line(aes(x=inf$Time,y=inf$Mortality,color = 'Mortality'))+geom_line(aes(x=inf$Time,y = Gamfit$residuals, color = 'Residuals'))+ggtitle("Residuals and the influenza values against time ")
+```
+
+Temporal pattern in the residuals seems to be correlated to the outbreaks of influenza.The spikes in the influenza is being predicted.
+
+### 1.6:Mortality modelled as an additive function
+
+```{r 1.6 Fit Gam modelwhich mortality is be modelled as an additive function,echo=FALSE }
+RNGversion("3.5.1")
+Gamfit3<-gam(Mortality~s(Year,k=length(unique(inf$Year)))+s(Week,k=length(unique(inf$Week)))+s(Influenza,k =length(unique((inf$Influenza)))),data = inf,family = 'gaussian',method = "GCV.Cp" )
+summary(Gamfit3)
+par(mfrow=c(2,2))
+plot.gam(Gamfit3)
+```
+ 
+The plot gives a comprehensive analysis of the rates of mortality vs the time, influenza rates and also the weeks . It is observeed that there is hardly any deviance in when plotted with the year and when plotted agaisnt the week it seems to spike only on the onset of the year and toward the end of the year.From the graphs it can be determined that there is a very good relationship woth mortality and Influenza.whereas there is a very poor relationship between the mortality and week and an even worse relationship between the mortlity and the year.The spikes in the moratlity values are correlating to that of the influenza values.
+
+```{r 1.6,echo=FALSE }
+RNGversion("3.5.1")
+Gampred_3<-predict(Gamfit3,inf)
+df<-data.frame(inf$Mortality,inf$Time,Gampred_3)
+
+ggplot(df)+geom_line(aes(x=inf$Time,y=inf$Mortality,color='Original'))+geom_point(aes(x=inf$Time,y=Gampred_3,color = 'Predicted Values'))
+```
+
+Here in this graph it seems to predict the values very close to the originl values with the minimal error.This shows that the mortality is influenced by the outbreaks of influenza and it has a high impact to the prediction of the mortality.
+
+
+## Assignment-2
+
+### 2.1
+```{r dividing the data,echo=FALSE}
+RNGversion("3.5.1")
+set.seed(12345)
+df2<-read.csv2("data.csv",sep = ";")
+df2$Conference = as.factor(df2$Conference)
+n=dim(df2)[1]
+
+id = sample(1:n,floor(n*0.7))
+train = df2[id,]
+test = df2[-id,]
+rownames(train)<-1:nrow(train)
+
+x_train<-t(as.matrix(train[,-4703]))
+y_train<-as.matrix(train[,4703])
+mydata<-list(x=x_train,y=y_train, geneid=as.character(1:nrow(x_train)),genenames=rownames(x_train))
+
+
+mytrain<-pamr.train(mydata)
+mycv <-  pamr.cv(mytrain, mydata,nfold = 10)
+pamr.plotcv(mycv)
+```
+
+```{r minimum threshold,echo=FALSE}
+RNGversion("3.5.1")
+mint<- mycv$threshold[which.min(mycv$error)]
+mytrain2<-pamr.train(mydata,threshold = mint)
+#Centroid Plot
+pamr.plotcen(mytrain,mydata,threshold = mint)
+```
+
+After applying the minimum threshold it can be observed that features on the top contribute more than the faetures towards the bottom.
+
+```{r Feature selected,echo=FALSE,include=FALSE}
+RNGversion("3.5.1")
+cent_fea <- pamr.listgenes(mytrain, mydata, threshold = mint, genenames=TRUE)
+
+```
+
+### 1.1-No. of Features Selected 
+```{r,echo=FALSE}
+RNGversion("3.5.1")
+cat("\nTotal Features Selected: ",dim(cent_fea)[1])
+```
+
+231 fratures were selected after the cross validation method.
+
+```{r,echo=FALSE }
+RNGversion("3.5.1")
+# featorder<-cent_fea[order(id),]
+
+cat("\nMost contributing featuers are")
+Features<-cent_fea[1:10,"name"]
+print(as.data.frame(Features))
+```
+
+The most contibuting features are printed above.It is reasonable to say that they have strong effect on the discrimination between the conference since they are all specific words.
+
+```{r,echo=FALSE}
+RNGversion("3.5.1")
+#Test error
+print("Test set performance")
+x_test <- t(as.matrix(test[,-4703]))
+y_test <- as.matrix(test[,4703])
+Shrink_pred <- pamr.predict(mytrain,newx=x_test,threshold = mint,type="class")
+cfMat <- table(y_test,Shrink_pred)
+print(cfMat)
+misCalc <- 1- sum(diag(cfMat))/sum(cfMat)
+cat("\nMisclassification rate on test: ",misCalc)
+```
+
+### 2.2-Part A:Elastic net
+
+```{r  Elastic net using glmnet package,echo=FALSE}
+RNGversion("3.5.1")
+set.seed(12345)
+x_train1<-as.matrix(train[,-4703])
+y_train1<-as.matrix(train$Conference)
+glmfit<-glmnet(x=x_train1,y=y_train1,family = "binomial",alpha = 0.5)
+gmlfitcv<-cv.glmnet(x=x_train1,y=y_train1,family = "binomial",alpha = 0.5)
+plot(gmlfitcv)
+plot(glmfit)
+
+```
+
+```{r test elastic net,echo=FALSE}
+RNGversion("3.5.1")
+set.seed(12345)
+x_test1<-as.matrix(test[,-4703])
+y_test1<-as.matrix(test$Conference)
+glm_test_pred<-predict(glmfit,x_test1,s=gmlfitcv$lambda.min,type = 'class')
+cfmat2<-table(y_test1,glm_test_pred)
+print(cfmat2)
+misCalc1<-1-sum(diag(cfmat2))/sum(cfmat2)
+glm_fea<-coef(gmlfitcv,s = "lambda.min")
+glm_fea<-as.matrix(glm_fea)
+index<-which(glm_fea != 0)
+glm_feat<-as.matrix(glm_fea[index,])
+feat_length<-length(glm_feat)
+cat("\n the misclassification rate using the test set was found out to be ",misCalc1)
+cat("\n The no of features selected are ",feat_length-1)
+
+
+```
+
+### 2.2-Part B:Support vector machine with “vanilladot” kernel.
+
+```{r Training support vector,echo=FALSE }
+RNGversion("3.5.1")
+set.seed(12345)
+kernel_fit<-ksvm(Conference~.,train,kernel = "vanilladot",scaled = 'FALSE')
+print(kernel_fit)
+```
+
+```{r test data,echo=FALSE}
+RNGversion("3.5.1")
+kernel_pred<-predict(kernel_fit,test,type = 'response')
+cfMat3<-table(test$Conference,kernel_pred)
+cfMat3
+misCalc2<-1 - sum(diag(cfMat3))/sum(cfMat3)
+cat("The misclassification rate for the svm is ",misCalc2)
+cat("\nThe number of selected features",length(as.matrix(kernel_fit@coef[[1]]))-1)
+```
+
+### Comparison between all models
+
+```{r ,echo=FALSE}
+RNGversion("3.5.1")
+misCalcRates<-c(misCalc,misCalc1,misCalc2)
+models<-c("Shrinken Centroid","Elastic net,Support","Vector Machine")
+fea_sel<-c(dim(cent_fea)[1],feat_length-1,length(as.matrix(kernel_fit@coef[[1]]))-1)
+resultant_df<-data.frame(Model = models,MisClassificationRate = misCalcRates,FeaturesSelected = fea_sel)
+print(resultant_df)
+```
+
+### 2.3:Benjamini-Hochberg method
+
+```{r Benjamin Hochman method,echo=FALSE}
+RNGversion("3.5.1")
+p_val<-data.frame(nrow = ncol(df2),ncol = 2)
+for (i in 1:4702) {
+  x<-df2[,i]
+  p_val[i,1]<-t.test(x~Conference,data = df2,alternative = "two.sided")$p.value
+  p_val[i,2] <- colnames(df2)[i]
+}
+
+#p_matrix<-data.frame('p-values' = p_val,'features' = 1:length(p_val))
+#order the p-values
+p_val <- p_val[order(p_val[,1]),]
+l_vec<-c()
+count = 1
+
+for (j in 1:nrow(p_val)) 
+{
+  l_vec[j] <- p_val[j,1] - ((0.05 * j)/4702)
+}
+
+
+
+ retrieve<-max(l_vec)
+
+
+cat("Total features rejected are :",length(p_val[which(l_vec <0),2]),"and the features are\n")
+rejfea=as.data.frame(p_val[which(l_vec <0),2])
+rejfea
+
+
+```
+From the results we can conclude that 39 features correspond to the rejected hypothesis.
+
+### Appendix
+
+```{r , ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+```
+
+
