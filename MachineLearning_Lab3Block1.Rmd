@@ -1,0 +1,235 @@
+---
+title: "MachineLearning_Lab3Block1"
+author: "Sreenand.S"
+date: "15/12/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(readr)
+library(kernlab)
+library(geosphere)
+```
+
+## Assignment 1 :Kernel Methods
+
+
+```{r Kernel Methods , echo=FALSE}
+RNGversion('3.5.1')
+set.seed(1234567890)
+stations <- read.csv("C:\\Users\\nandu\\Desktop\\Machine learning\\Lab3_Block1\\stations.csv")
+temps <- read.csv("C:\\Users\\nandu\\Desktop\\Machine learning\\Lab3_Block1\\temps50k.csv")
+st <- merge(stations,temps,by="station_number")
+
+h_distance <- 1000000# These three values are up to the students
+h_date <-20
+h_time <-5
+a <- 58.4274 # The point to predict (up to the students)
+b <- 14.826
+date <- "1996-01-04" # The date to predict (up to the students)
+times <- c("04:00:00", "06:00:00", "08:00:00","10:00:00",
+           "12:00:00" ,"14:00:00", "16:00:00","18:00:00",
+           "20:00:00","22:00:00","24:00:00")
+sum_vector <- vector(length=length(times))
+mult_vector <- vector(length=length(times))
+
+```
+### 1.1
+
+We are taking the value of 1000000 as the distance as it would be very minimalistic once we use the exponent funciton.
+The distances from the given plot are seen as really big values out of which we choose 10^6 as our gaussian kernel value.
+H-date has been taken as 20 considering the that more weightage is given to the days that are nearer to the given date.
+Time is taken as 5 hours out of the 24 hours as it was observed that with lesser value of time there is a more accurate prediction of the time.
+The date has been set to 1996-01-04.
+
+
+
+```{r,echo=FALSE}
+RNGversion('3.5.1')
+#Date
+st$date_diff = as.numeric(difftime(date,st$date,units = c("days")))
+#daydel<-which(date_diff<0)
+st<-st[st$date_diff>0,]
+for (i in 1:length(st$date_diff)) {
+st$date_diff[i] = min(365 - st$date_diff[i]%%365,st$date_diff[i]%%365)
+}
+test<-sort(st$date_diff)
+plot(exp(-(test/ h_date) ^ 2), main = "Optimal Value for date kernel")
+st$date_diff = exp(-(test / h_date) ^ 2)
+
+#distance calculation
+st$dist_vec = abs(distHaversine(st[,c(5,4)], c(a,b)))
+test2<-sort(st$dist_vec)
+plot(exp(-(test2 / h_distance) ^ 2), main = "Optimal Value for distance kernel")
+st$dist_vec = exp(-(test2 / h_distance) ^ 2)
+ 
+ 
+  
+for (i in 1:length(times)) 
+{
+   st[times[i]]<- as.numeric(abs(difftime(strptime(times[i],"%H"),strptime(as.character(st[,'time']),"%H"),units = c("hours"))))
+   
+   st[,(i+14)] <- sapply(st[,(i+14)], function(x) min(x,(24-x)) )
+   
+   
+  
+}
+  time_vec = exp(-(st[,15:25]/h_time)^2)
+#for (k in 1:length(times)) {
+  sum_k = st$dist_vec + st$date_diff + time_vec
+  sumk = st$air_temperature * sum_k
+  sum_vector = colSums(sumk) / colSums(sum_k)
+  
+  
+  mul_k = st$dist_vec * st$date_diff *  time_vec
+  mulk = st$air_temperature * mul_k
+  mult_vector = colSums(mulk) / colSums(mul_k)
+#}
+
+# Convert to Standard time
+conv_time = as.POSIXlt(paste(Sys.Date(), times), format="%Y-%m-%d %H:%M:%S")
+print(conv_time)
+
+# testsist = distHaversine(c(55.38360,12.82030),c(58.4274,14.826))
+ # std_time = as.POSIXlt(paste(Sys.time(), "04:00:00"), format="%Y-%m-%d %H:%M:%S")
+```
+
+```{r ,echo=FALSE}
+plot(x = conv_time,y = sum_vector,type = 'o', main = ' Kernel Sum and Kernal Multiplication',xlab='Time',
+       ylab = 'Temprature',col = 'red',ylim = c(4,9)  )
+
+  paste("Temperature values for the kernel addition are ",sum_vector)
+
+points(x = conv_time,y = mult_vector,type = 'o', main = ' Kernel Multiplication',xlab='Time', ylab = 'Temprature',col = 'green' ,  )
+paste0("Temperature values for the kernel multiplication are ",mult_vector)
+```
+
+### 1.2
+
+Here it is observed that the kernel multiplication bell curve is much higher than that of the sum kernel. The predictions are much higher than sum kernel and this is because the product of small values in turn gives an even smaller value. Similarly product of higher values give a higher value producing a wider band.
+
+
+
+## Assignment 2: Kernel SVM 
+
+### 2.1 Model selection
+```{r SVM,echo=FALSE}
+RNGversion('3.5.1')
+data("spam")
+df<- spam
+n = dim(df)[1]
+set.seed(12345) 
+id = sample(1:n, floor(n*0.5))
+train = df[id,] 
+id1 = setdiff(1:n, id)
+set.seed(12345)
+id2 = sample(id1, floor(n*0.25))
+valid = df[id2,]
+id3 = setdiff(id1,id2)
+test = df[id3,] 
+combined = rbind(train,valid)
+
+svm_model1<-ksvm(type~.,data = train,C=0.5,kernel = "rbfdot", kpar = list(sigma = 0.05))
+svm_model2<-ksvm(type~.,data = train,C=1,kernel = "rbfdot",kpar = list(sigma = 0.05))
+svm_model3<-ksvm(type~.,data = train,C=5,kernel = "rbfdot",kpar = list(sigma = 0.05))
+svm_pred1<-predict(svm_model1,valid,type = "response")
+svm_pred2<-predict(svm_model2,valid,type = "response")
+svm_pred3<-predict(svm_model3,valid,type = "response")
+print(svm_model1)
+print(svm_model2)
+print(svm_model3)
+par(mfrow = c(2,2))
+
+# plot(df$type)
+# plot(svm_pred1)
+# plot(svm_pred2)
+# plot(svm_pred3)
+
+confusionmatrix1<-table(svm_pred1,valid$type)
+confusionmatrix1
+misclas1 = 1- sum(diag(confusionmatrix1))/sum(confusionmatrix1)
+cat("The misclassification rate  for model 1 is ",misclas1)
+
+confusionmatrix2<-table(svm_pred2,valid$type)
+confusionmatrix2
+misclas2 = 1- sum(diag(confusionmatrix2))/sum(confusionmatrix2)
+cat("\nThe misclassification rate for model 2 is ",misclas2)
+
+confusionmatrix3<-table(svm_pred3,valid$type)
+confusionmatrix3
+misclas3 = 1- sum(diag(confusionmatrix3))/sum(confusionmatrix3)
+cat("\nThe misclassification rate for model 3 is ",misclas3)
+
+## Including Plots
+
+
+```
+
+### 1.1
+
+Here C is the slack parameter and more the value of C wider is the margin.
+Here it is obseverved that with the increase in C value the no. of support vectors are reducing.
+When,
+C = 0.5 :total no. of support vectors are 1077 and misclassification rate is 8.6%
+C = 1 :total no. of support vectors are 1007 and misclassification rate is 6.9% 
+C = 5 :total no. of support vectors are 966 and misclassification rate is 7.4%
+Here,infact the slack reduces with the increase in C parameter.The model with the  C=1 value seems to be have a better accuracy than the rest of the models of the and is observed to be the best fit for the data.
+
+### Generalization error
+```{r,echo= FALSE}
+RNGversion('3.5.1')
+svm_model2<-ksvm(type~.,data = combined,C=1,kernel = "rbfdot",kpar = list(sigma = 0.05))###combined = validation data + training data
+
+svm_pred2<-predict(svm_model2,test,type = "response")
+
+print(svm_model2)
+
+confusionmatrix2<-table(svm_pred2,test$type)
+confusionmatrix2
+misclas2 = 1- sum(diag(confusionmatrix2))/sum(confusionmatrix2)
+cat("\nThe misclassification rate for model 2 is ",misclas2)
+
+
+```
+
+
+We have chosen C=1 as the slack parameter from the previos results and trained it on the combined table of training and validation and predict using the test data which has been untouched.
+This produces a miscalssification rate of 8.2% which is almost close to the previous result hence we 
+
+
+### 2.2 Generalization error
+```{r,echo=FALSE}
+#Using the whole dataframe
+RNGversion('3.5.1')
+svm_model4<-ksvm(type~.,data=df,C=1,kernel = "rbfdot",kpar = list(sigma = 0.05))
+print(svm_model4)
+svm_pred4<-predict(svm_model4,df)
+plot(svm_pred4)
+
+confusionmatrix4<-table(svm_pred4,df$type)
+confusionmatrix4
+misclas4 = 1- sum(diag(confusionmatrix4))/sum(confusionmatrix4)
+cat("The misclassification rate  when whole dataframe is used is ",misclas4)
+```
+
+
+When the C value after finding the miscalculation rates and applied here over the whole dataset then the it is found to be only 3.9% and the no. of vectors 1655.
+The error here can be comapared as less than that of the generaliation error.
+
+
+### Return to the user
+```{r ,echo=FALSE}
+svm_model4<-ksvm(type~.,data=df,C=1,kernel = "rbfdot",kpar = list(sigma = 0.05))
+svm_model4
+```
+
+
+
+### Purpose of the C parameter
+
+C is the slack parameter and more the value of C wider is the margin.
+
+```{r , ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+```
