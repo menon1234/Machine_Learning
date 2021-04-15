@@ -1,5 +1,5 @@
 ---
-title: "KNN,Linear Regression and regularization(Lasso and Ridge)"
+title: "KNN,Logistic,Linear Regression and regularization(Lasso and Ridge)"
 author: "Sreenand.S"
 date: "24/11/2019"
 output: html_document
