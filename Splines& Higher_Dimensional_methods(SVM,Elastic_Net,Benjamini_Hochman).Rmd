@@ -1,5 +1,5 @@
 ---
-title: "Lab2Block2"
+title: "Splines& Higher_Dimensional_methods(SVM,Elastic_Net,Benjamini_Hochman)"
 author: "Sreenand.S"
 date: "10/12/2019"
 output: 
