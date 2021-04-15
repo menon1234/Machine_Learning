@@ -6,7 +6,7 @@ KNN\
 Logistic Regression\
 Naive Bayes \
 Random Forest\
-SVM\
+SVM
 
 Feature Reduction Techniques Used - 
 PCA,LDA 
