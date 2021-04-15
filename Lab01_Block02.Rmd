@@ -1,5 +1,5 @@
 ---
-title: "Lab01_Block2 "
+title: "Ensemble Methods and EM on Mixture Models "
 author: "Sreenand.S"
 date: "03/12/2019"
 output: html_document
